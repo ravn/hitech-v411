@@ -1,4 +1,34 @@
-# HI-TECH-Z80-C-Cross-Compiler
+# HI-TECH-Z80-C-Cross-Compiler (ravn/hitech-v411 fork)
+
+This is the HI-TECH Z80 C Cross Compiler (MS-DOS) v4.11
+
+## ravn fork additions
+
+Content-identical to
+[agn453/HI-TECH-Z80-C-Cross-Compiler](https://github.com/agn453/HI-TECH-Z80-C-Cross-Compiler)
+on the V4.11 distribution itself; this fork adds a Docker wrapper plus
+diagnostic tools:
+
+- **`Dockerfile`** — wraps the V4.11 DOS toolchain in DOSBox so it runs
+  on any Linux/macOS host without a host DOS install. `docker build -t
+  hitech-v411 .` produces an image. Bind-mount your source dir as
+  `/work`, and any of `zc cpp p1 cgen optim zas link objtohex libr cref
+  dehuff` becomes a host-callable command via `docker run … hitech-v411
+  zc -CPM hello.c`.
+- **`hitech-wrap`** — the per-tool entrypoint that runs the requested
+  V4.11 tool under DOSBox with `/work` mounted as `D:\` and the V4.11
+  install at `C:\`.
+- **`tests/run-all-tests.sh`** — verifies key V4.11 capabilities on
+  the image: CP/M baseline compile, ROM mode `-A0,8000,1000`, codegen
+  `.as` listing, `interrupt` qualifier, `port` qualifier, dialect
+  surface (`inline`, for-decl, `//`), V4.11-vs-V3.09 size comparison,
+  inline-asm syntax.
+- **`tools/`** — DOS-side diagnostic utilities (NASM source). Currently
+  `runcap.asm` (stderr capture for DOS programs in DOSBox via INT
+  21h/46h DUP2) and `dup2test.asm` (sanity-check). See
+  [tools/README.md](tools/README.md) for the story.
+
+## Upstream README continues:
 
 This is the HI-TECH Z80 C Cross Compiler (MS-DOS) v4.11
 

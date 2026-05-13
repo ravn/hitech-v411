@@ -1,0 +1,57 @@
+#!/bin/sh
+# Wrapper that runs a HI-TECH C V4.11 DOS tool (zc, cpp, p1, cgen, optim,
+# zas, link, objtohex, libr, cref, dehuff) under DOSBox.
+#
+# Approach:
+#   - /opt/hitech (host) is mounted as C:\ inside DOSBox (zc lives there).
+#   - /work (bind-mounted by the user) is mounted as D:\ inside DOSBox.
+#   - HITECH=C:\ env var is set so the driver finds its sub-tools.
+#   - Working directory inside DOSBox is D:\ so produced files land in /work.
+#   - DOS doesn't have `2>&1`; we capture stdout to a temp file inside D:\
+#     and re-emit it on the host stdout after DOSBox exits.
+
+set -eu
+
+tool=$(basename "$0")
+case "$tool" in
+    zc|cpp|p1|cgen|optim|zas|link|objtohex|libr|cref|dehuff) ;;
+    hitech-wrap)
+        echo "usage: invoke as one of: zc cpp p1 cgen optim zas link objtohex libr cref dehuff" >&2
+        exit 64 ;;
+    *) echo "$tool: unknown HI-TECH tool" >&2; exit 64 ;;
+esac
+
+# Build a single DOS-style command line.  Spaces in args aren't supported.
+dos_cmd="C:\\$(echo "$tool" | tr a-z A-Z).EXE"
+for a in "$@"; do
+    dos_cmd="$dos_cmd $a"
+done
+
+# Capture DOS-side stdout to a file under D:\ so we can re-emit it on host.
+out=$(mktemp -u .hitech-XXXXXX.LOG)
+dos_cmd="$dos_cmd > $out"
+
+dosbox -conf /dev/null -noautoexec -exit \
+    -c "mount c /opt/hitech" \
+    -c "mount d /work" \
+    -c "set HITECH=C:\\" \
+    -c "d:" \
+    -c "$dos_cmd" \
+    -c "exit" \
+    > /dev/null 2>&1
+
+# Re-emit the captured DOS output (case-insensitive lookup; DOSBox may
+# have upper-cased the filename).
+rc=0
+for f in "/work/$out" "/work/$(echo "$out" | tr a-z A-Z)"; do
+    if [ -s "$f" ]; then
+        cat "$f"
+        if grep -qE 'exit 1$|Illegal|cannot|Cant find|No such|error|Error' "$f"; then
+            rc=1
+        fi
+        rm -f "$f"
+        break
+    fi
+    rm -f "$f" 2>/dev/null || true
+done
+exit $rc
